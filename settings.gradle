@@ -1,4 +1,4 @@
 pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement { repositories { google(); mavenCentral() } }
 rootProject.name = "Yaycelov"
-include ':app', ':ballistics', ':ballistic2'
+include ':app', ':ballistics', ':ballistic2', ':kosmotext'

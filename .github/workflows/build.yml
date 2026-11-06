@@ -16,6 +16,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Подготовить Космотекст (Three.js и шрифты)
+        run: python3 kosmotext/prep.py
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
@@ -24,6 +26,7 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             ballistics/build/outputs/apk/debug/ballistics-debug.apk
             ballistic2/build/outputs/apk/debug/ballistic2-debug.apk
+            kosmotext/build/outputs/apk/debug/kosmotext-debug.apk
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,4 +34,5 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk Yaycelov.apk
           cp ballistics/build/outputs/apk/debug/ballistics-debug.apk Ballistics.apk
           cp ballistic2/build/outputs/apk/debug/ballistic2-debug.apk Ballistics3D.apk
-          gh release create v1.2-${{ github.run_number }} Yaycelov.apk Ballistics.apk Ballistics3D.apk --title "APK: Яйцелов и калькуляторы" --notes "Отладочные APK"
+          cp kosmotext/build/outputs/apk/debug/kosmotext-debug.apk Kosmotext.apk
+          gh release create v1.3-${{ github.run_number }} Yaycelov.apk Ballistics.apk Ballistics3D.apk Kosmotext.apk --title "APK: Яйцелов и калькуляторы" --notes "Отладочные APK"
