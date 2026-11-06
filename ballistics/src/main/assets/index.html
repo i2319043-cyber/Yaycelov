@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Баллистический калькулятор</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #10141c; color: #e8ecf3;
+padding: 10px; touch-action: manipulation; }
+h1 { font-size: 1.1rem; text-align: center; margin-bottom: 8px; color: #7fc7ff; }
+.panel { background: #1a2130; border-radius: 12px; padding: 10px;
+margin-bottom: 10px; border: 1px solid #2c3a52; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+label { display: block; font-size: 0.72rem; color: #9db0cc; margin-bottom: 2px; }
+select, input { width: 100%; padding: 9px; font-size: 0.95rem;
+background: #0d1220; color: #e8ecf3; border: 1px solid #34455f; border-radius: 8px; }
+button { width: 100%; padding: 12px; font-size: 1rem; font-weight: bold;
+border: none; border-radius: 10px; margin-top: 8px;
+background: #2f7fd1; color: #fff; }
+button.stop { background: #d1562f; }
+canvas { width: 100%; height: 46vw; max-height: 320px;
+background: #0d1220; border-radius: 10px; display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th, td { border-bottom: 1px solid #2c3a52; padding: 5px 6px; text-align: right; }
+th { color: #7fc7ff; font-weight: 600; text-align: right; }
+td:first-child, th:first-child { text-align: left; }
+.live { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 0.85rem; }
+.live b { color: #7fc7ff; font-weight: 600; }
+.scroll { max-height: 180px; overflow-y: auto; }
+h2 { font-size: 0.85rem; color: #9db0cc; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<h1>🎯 Баллистический калькулятор</h1>
+
+<div class="panel">
+<div class="grid2">
+<div>
+<label>Тело (пресет)</label>
+<select id="preset">
+<option value="9mm">Пуля 9×19 мм (8 г)</option>
+<option value="762">Пуля 7,62 мм (7,9 г)</option>
+<option value="cannon">Пушечное ядро (5 кг)</option>
+<option value="steelball">Стальной шарик Ø20 мм</option>
+<option value="stone">Камень 500 г</option>
+<option value="tennis">Теннисный мяч</option>
+<option value="pingpong">Шарик для пинг-понга</option>
+<option value="football">Футбольный мяч</option>
+<option value="arrow">Стрела</option>
+<option value="shotput">Ядро 7,26 кг</option>
+<option value="custom">Свои параметры</option>
+</select>
+</div>
+<div>
+<label>Сопротивление воздуха</label>
+<select id="dragOn">
+<option value="1">Учитывать</option>
+<option value="0">Не учитывать (вакуум)</option>
+</select>
+</div>
+<div>
+<label>Масса m, кг</label>
+<input type="number" id="mass" step="any" value="0.008">
+</div>
+<div>
+<label>Диаметр d, м</label>
+<input type="number" id="diam" step="any" value="0.009">
+</div>
+<div>
+<label>Cd (коэфф. сопротивл.)</label>
+<input type="number" id="cd" step="any" value="0.30">
+</div>
+<div>
+<label>Плотность воздуха ρ, кг/м³</label>
+<input type="number" id="rho" step="any" value="1.225">
+</div>
+<div>
+<label>Нач. скорость v₀, м/с</label>
+<input type="number" id="v0" step="any" value="380">
+</div>
+<div>
+<label>Угол α, °</label>
+<input type="number" id="angle" step="any" value="45">
+</div>
+</div>
+<label style="margin-top:8px">Скорость анимации: <span id="spLbl">1.0×</span></label>
+<input type="range" id="speed" min="0.05" max="3" step="0.05" value="1" style="width:100%">
+<button id="btnRun" type="button">▶ Запуск</button>
+<div id="msg" style="color:#ff8a6b;font-size:0.8rem;margin-top:6px"></div>
+</div>
+
+<div class="panel">
+<h2>Траектория полёта</h2>
+<canvas id="cv"></canvas>
+<div class="live" id="live" style="margin-top:8px">
+<span><b>t:</b> <span id="lt">–</span> с</span>
+<span><b>x:</b> <span id="lx">–</span> м</span>
+<span><b>y:</b> <span id="ly">–</span> м</span>
+<span><b>v:</b> <span id="lv">–</span> м/с</span>
+<span><b>vx:</b> <span id="lvx">–</span> м/с</span>
+<span><b>vy:</b> <span id="lvy">–</span> м/с</span>
+<span><b>|a|:</b> <span id="la">–</span> м/с²</span>
+<span><b>Перегрузка n:</b> <span id="ln">–</span> g</span>
+<span><b>E кин:</b> <span id="lek">–</span> Дж</span>
+<span><b>E пот:</b> <span id="lep">–</span> Дж</span>
+<span><b>Импульс:</b> <span id="lp">–</span> кг·м/с</span>
+<span><b>Число M:</b> <span id="lm">–</span></span>
+</div>
+</div>
+
+<div class="panel">
+<h2>Итоговые параметры</h2>
+<table id="sumTable">
+<tr><th>Параметр</th><th>Значение</th></tr>
+</table>
+</div>
+
+<div class="panel">
+<h2>Журнал полёта (каждые 0,5 с)</h2>
+<div class="scroll">
+<table id="logTable">
+<tr>
+<th>t, с</th><th>x, м</th><th>y, м</th>
+<th>v, м/с</th><th>|a|, м/с²</th><th>n, g</th><th>E, Дж</th>
+</tr>
+</table>
+</div>
+</div>
+
+<script>
+"use strict";
+const G = 9.80665, MACH = 340.3;
+
+const PRESETS = {
+"9mm": [0.008, 0.009, 0.30],
+"762": [0.0079, 0.0079, 0.30],
+"cannon": [5.0, 0.120, 0.47],
+"steelball":[0.0329, 0.020, 0.47],
+"stone": [0.5, 0.080, 0.50],
+"tennis": [0.058, 0.067, 0.50],
+"pingpong": [0.0027, 0.040, 0.50],
+"football": [0.43, 0.220, 0.25],
+"arrow": [0.035, 0.008, 1.00],
+"shotput": [7.26, 0.130, 0.47]
+};
+
+const $ = id => document.getElementById(id);
+
+$("preset").addEventListener("change", e => { const p = PRESETS[e.target.value]; if (p) { $("mass").value = p[0]; $("diam").value = p[1]; $("cd").value = p[2]; }
+});
+
+function simulate(v0, angleDeg, m, d, cd, rho, withDrag) {
+const a = angleDeg * Math.PI / 180;
+let x = 0, y = 0, vx = v0 * Math.cos(a), vy = v0 * Math.sin(a);
+const dt = 0.0005, every = 20; // точка траектории каждые 0,01 с
+const k = withDrag ? 0.5 * rho * cd * Math.PI * (d / 2) ** 2 / m : 0;
+const pts = [{ t: 0, x, y, vx, vy }];
+let t = 0, maxY = 0, n = 0, landed = false;
+while (t < 600) {
+const v = Math.hypot(vx, vy);
+const ax = -k * v * vx, ay = -k * v * vy - G;
+const px = x, py = y, pvx = vx, pvy = vy;
+vx += ax * dt; vy += ay * dt;
+x += vx * dt; y += vy * dt;
+t += dt; n++;
+if (y > maxY) maxY = y;
+if (y <= 0 && t > 0.001) {
+// точка приземления: линейная интерполяция внутри последнего шага
+const f = py / (py - y);
+x = px + (x - px) * f; vx = pvx + (vx - pvx) * f; vy = pvy + (vy - pvy) * f;
+y = 0; t = t - dt + dt * f; landed = true;
+pts.push({ t, x, y, vx, vy });
+break;
+}
+if (n % every === 0) pts.push({ t, x, y, vx, vy });
+}
+if (!landed) pts.push({ t, x, y, vx, vy });
+return { pts, t, x, vx, vy, maxY, landed,
+vImpact: Math.hypot(vx, vy),
+angleImpact: Math.atan2(vy, vx) * 180 / Math.PI };
+}
+
+let anim = null;
+
+$("btnRun").addEventListener("click", () => { if (anim && anim.running) { anim.running = false; $("btnRun").textContent = "▶ Запуск";
+$("btnRun").classList.remove("stop"); return; } const v0 = +$("v0").value, ang = +$("angle").value; const m = +$("mass").value, d = +$("diam").value; const cd = +$("cd").value, rho = +$("rho").value; const dragOn = $("dragOn").value === "1";
+if (!(v0 > 0) || !(m > 0) || !(d > 0) || !(ang > 0 && ang <= 90) || !(cd >= 0) || !(rho >= 0)) {
+$("msg").textContent = "Проверьте значения: v₀, масса и диаметр должны быть больше 0, угол от 0 до 90°, Cd и ρ не меньше 0.";
+return;
+}
+$("msg").textContent = "";
+
+const sim = simulate(v0, ang, m, d, cd, rho, dragOn);
+anim = { sim, t: 0, running: true, lastLog: -1, idx: 0, prev: null, m, d, cd, rho, dragOn };
+$("btnRun").textContent = "■ Стоп"; $("btnRun").classList.add("stop");
+const lt = $("logTable");
+while (lt.rows.length > 1) lt.deleteRow(1);
+buildSummary(sim, m, dragOn);
+requestAnimationFrame(frame);
+});
+
+$("speed").addEventListener("input", e => { $("spLbl").textContent = (+e.target.value).toFixed(2) + "×"; });
+
+function buildSummary(s, m, dragOn) {
+const t = $("sumTable");
+while (t.rows.length > 1) t.deleteRow(1);
+const rows = [
+["Время полёта", s.t.toFixed(2) + " с"],
+["Дальность", s.x.toFixed(1) + " м"],
+["Макс. высота", s.maxY.toFixed(1) + " м"],
+["Скорость падения", s.vImpact.toFixed(1) + " м/с (" + (s.vImpact / MACH).toFixed(2) + " M)"],
+["Угол падения", Math.abs(s.angleImpact).toFixed(1) + "°"],
+["Энергия удара", (0.5 * m * s.vImpact ** 2).toFixed(1) + " Дж"],
+["Сопротивление", dragOn ? "учтено" : "вакуум"]
+];
+if (!s.landed) rows.push(["Внимание", "расчёт обрезан на 600 с"]);
+rows.forEach(r => {
+const tr = t.insertRow();
+tr.insertCell().textContent = r[0];
+tr.insertCell().textContent = r[1];
+});
+}
+
+function interp(pts, t) {
+while (anim.idx < pts.length - 1 && pts[anim.idx + 1].t <= t) anim.idx++;
+const i = anim.idx, a = pts[i], b = pts[Math.min(i + 1, pts.length - 1)];
+const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
+return {
+x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f,
+vx: a.vx + (b.vx - a.vx) * f, vy: a.vy + (b.vy - a.vy) * f
+};
+}
+
+function frame(now) {
+if (!anim || !anim.running) return;
+if (anim.prev === null) anim.prev = now; // <-- исправление: сброс времени
+const sp = +$("speed").value;
+anim.t += Math.min(now - anim.prev, 100) / 1000 * sp;
+anim.prev = now;
+
+const s = anim.sim, p = interp(s.pts, Math.min(anim.t, s.t));
+const { m, d, cd, rho, dragOn } = anim;
+const v = Math.hypot(p.vx, p.vy);
+
+// ускорение по компонентам: гравитация + сопротивление
+let ax = 0, ay = -G, k = 0;
+if (dragOn && v > 0) {
+k = 0.5 * rho * cd * Math.PI * (d / 2) ** 2 / m;
+ax = -k * v * p.vx;
+ay = -k * v * p.vy - G;
+}
+const aTot = Math.hypot(ax, ay);
+const n = k * v * v / G;
+const Ek = 0.5 * m * v * v, Ep = m * G * p.y;
+
+$("lt").textContent = Math.min(anim.t, s.t).toFixed(2); $("lx").textContent = p.x.toFixed(1);
+$("ly").textContent = p.y.toFixed(1); $("lv").textContent = v.toFixed(1);
+$("lvx").textContent = p.vx.toFixed(1); $("lvy").textContent = p.vy.toFixed(1);
+$("la").textContent = aTot.toFixed(1); $("ln").textContent = n.toFixed(2);
+$("lek").textContent = Ek.toFixed(1); $("lep").textContent = Ep.toFixed(1);
+$("lp").textContent = (m * v).toFixed(2); $("lm").textContent = (v / MACH).toFixed(2);
+
+if (Math.floor(anim.t / 0.5) > anim.lastLog) {
+anim.lastLog = Math.floor(anim.t / 0.5);
+const tr = $("logTable").insertRow();
+[Math.min(anim.t, s.t), p.x, p.y, v, aTot, n, Ek + Ep]
+.forEach((val, i) => tr.insertCell().textContent =
+i === 0 ? val.toFixed(2) : val.toFixed(1));
+}
+
+drawScene(s, p);
+if (anim.t >= s.t) {
+anim.running = false;
+$("btnRun").textContent = "▶ Запуск";
+$("btnRun").classList.remove("stop");
+} else requestAnimationFrame(frame);
+}
+
+function drawScene(s, cur) {
+const cv = $("cv"), dpr = window.devicePixelRatio || 1;
+const W = cv.clientWidth || 300, H = cv.clientHeight || 150;
+if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+const ctx = cv.getContext("2d");
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ctx.clearRect(0, 0, W, H);
+
+const pad = 30;
+const sx = (W - pad - 10) / Math.max(s.x, 1);
+const sy = (H - pad - 20) / Math.max(s.maxY, 1);
+const k = Math.min(sx, sy);
+const X = x => pad + x * k, Y = y => H - 15 - y * k;
+
+// ось и разметка
+ctx.strokeStyle = "#2c3a52"; ctx.lineWidth = 1; ctx.beginPath();
+const step = niceStep(s.x);
+for (let gx = 0; gx <= s.x; gx += step) {
+ctx.moveTo(X(gx), Y(0)); ctx.lineTo(X(gx), Y(0) + 5);
+}
+ctx.moveTo(pad, Y(0)); ctx.lineTo(W - 5, Y(0));
+ctx.stroke();
+ctx.fillStyle = "#6b7c99"; ctx.font = "9px sans-serif";
+for (let gx = 0; gx <= s.x; gx += step)
+ctx.fillText(+gx.toFixed(2) + " м", X(gx) - 8, H - 3);
+
+// след из точек — движение видно даже у быстрой пули
+const total = s.pts.length;
+const trailStep = Math.max(1, Math.floor(total / 60));
+ctx.fillStyle = "#4a6a9a";
+for (let i = 0; i <= anim.idx; i += trailStep) {
+const p = s.pts[i];
+ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 1.5, 0, 2 * Math.PI); ctx.fill();
+}
+
+// пройденная линия
+ctx.strokeStyle = "#2f7fd1"; ctx.lineWidth = 2; ctx.beginPath();
+for (let i = 0; i <= anim.idx; i++) {
+const p = s.pts[i];
+i ? ctx.lineTo(X(p.x), Y(p.y)) : ctx.moveTo(X(p.x), Y(p.y));
+}
+ctx.stroke();
+
+// тело
+ctx.fillStyle = "#ffd35c"; ctx.beginPath();
+ctx.arc(X(cur.x), Y(cur.y), 6, 0, 2 * Math.PI); ctx.fill();
+
+// вектор скорости
+const vv = Math.hypot(cur.vx, cur.vy) || 1, vs = 30;
+ctx.strokeStyle = "#7fff9e"; ctx.lineWidth = 2; ctx.beginPath();
+ctx.moveTo(X(cur.x), Y(cur.y));
+ctx.lineTo(X(cur.x) + cur.vx / vv * vs, Y(cur.y) - cur.vy / vv * vs);
+ctx.stroke();
+}
+
+function niceStep(range) {
+if (!(range > 0)) return 1;
+const raw = range / 10, p = 10 ** Math.floor(Math.log10(raw));
+return [1, 2, 5, 10].map(x => x * p).find(x => x >= raw) || raw;
+}
+</script>
+</body>
+</html>
