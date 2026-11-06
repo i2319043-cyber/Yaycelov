@@ -23,10 +23,12 @@ jobs:
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             ballistics/build/outputs/apk/debug/ballistics-debug.apk
+            ballistic2/build/outputs/apk/debug/ballistic2-debug.apk
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk Yaycelov.apk
           cp ballistics/build/outputs/apk/debug/ballistics-debug.apk Ballistics.apk
-          gh release create v1.1-${{ github.run_number }} Yaycelov.apk Ballistics.apk --title "APK: Яйцелов и Баллистика" --notes "Отладочные APK"
+          cp ballistic2/build/outputs/apk/debug/ballistic2-debug.apk Ballistics3D.apk
+          gh release create v1.2-${{ github.run_number }} Yaycelov.apk Ballistics.apk Ballistics3D.apk --title "APK: Яйцелов и калькуляторы" --notes "Отладочные APK"

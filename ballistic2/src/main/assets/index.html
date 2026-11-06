@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Баллистический калькулятор</title>
+<style>
+  :root { --bg:#12161c; --card:#1b212a; --line:#2a323e; --txt:#e8ecf1; --mut:#8b97a8; --acc:#e0a526; --blue:#4da3ff; --red:#ff6b6b; --grn:#5fd38d; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.4 system-ui,sans-serif; padding:12px 12px 40px; max-width:760px; margin-inline:auto; }
+  h1 { font-size:20px; margin:4px 0 12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:0 0 10px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .span2 { grid-column:1/3; }
+  label { display:block; font-size:12px; color:var(--mut); margin-bottom:3px; }
+  input, select { width:100%; background:#0f1318; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:16px; }
+  input[type=checkbox] { width:auto; }
+  input[type=range] { padding:0; }
+  button { width:100%; background:var(--acc); color:#1a1300; border:0; border-radius:10px; padding:14px; font-size:17px; font-weight:700; }
+  button.sec { background:var(--blue); color:#04121f; }
+  .btnrow { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .wrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; white-space:nowrap; }
+  th, td { padding:7px 8px; text-align:right; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; font-size:12px; position:sticky; top:0; background:var(--card); }
+  td:first-child, th:first-child { text-align:left; }
+  tr.zero td { color:var(--acc); }
+  tr.land td { color:var(--blue); }
+  .note { font-size:12px; color:var(--mut); margin-top:8px; }
+  .err { color:#ff7a7a; margin-top:8px; }
+
+  /* визуализация */
+  #viz { position:fixed; inset:0; background:var(--bg); z-index:50; overflow:auto; padding:10px 12px 30px; }
+  .vbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .vbar b { font-size:17px; }
+  .vbar button { width:auto; padding:8px 14px; background:var(--card); color:var(--txt); border:1px solid var(--line); }
+  canvas { width:100%; display:block; background:#0f1318; border:1px solid var(--line); border-radius:10px; }
+  #cv { height:min(44vh,380px); touch-action:none; }
+  #cg { height:150px; }
+  .ctl { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .ctl button { width:auto; padding:9px 16px; font-size:16px; }
+  .ctl select { width:auto; padding:8px; font-size:14px; }
+  .ctl label { display:flex; align-items:center; gap:5px; margin:0; font-size:13px; color:var(--txt); }
+  .reads { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:10px 0; }
+  .rd { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .rd .l { display:block; font-size:11px; color:var(--mut); line-height:1.2; min-height:26px; }
+  .rd b { font-size:15px; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<h1>Баллистический калькулятор</h1>
+
+<div class="card">
+  <h2>Тело (пресет)</h2>
+  <select id="preset">
+    <option value="">— выбрать —</option>
+    <optgroup label="Пули (пристрелка)">
+      <option value="308">.308 Win, 168 gr (10,9 г)</option>
+      <option value="223">.223 Rem, 55 gr (3,56 г)</option>
+      <option value="54r">7,62×54R, 148 gr (9,6 г)</option>
+      <option value="9mm">9×19 мм, 124 gr (8,0 г)</option>
+      <option value="22lr">.22 LR, 40 gr (2,6 г)</option>
+      <option value="pellet">Пневматика 4,5 мм (0,54 г)</option>
+    </optgroup>
+    <optgroup label="Метаемые тела (угол вылета)">
+      <option value="arrow">Стрела спортивного лука (28 г)</option>
+      <option value="baseball">Бейсбольный мяч</option>
+      <option value="golf">Мяч для гольфа</option>
+      <option value="soccer">Футбольный мяч</option>
+      <option value="shot">Ядро для толкания (7,26 кг)</option>
+      <option value="stone">Брошенный камень (100 г)</option>
+      <option value="cannonball">Чугунное ядро XVIII в. (≈2,7 кг)</option>
+    </optgroup>
+  </select>
+  <div class="note">Данные ориентировочные: для точного расчёта вводите паспортные данные вручную. Любое поле можно изменить после выбора пресета.</div>
+</div>
+
+<div class="card">
+  <h2>Тело и сопротивление</h2>
+  <div class="grid">
+    <div><label>Нач. скорость, м/с</label><input id="v0" type="number" inputmode="decimal" value="800"></div>
+    <div><label>Масса, г</label><input id="mass" type="number" inputmode="decimal" value="10.9"></div>
+    <div class="span2"><label>Модель сопротивления</label>
+      <select id="model">
+        <option value="G1">G1 (по баллистическому коэф.)</option>
+        <option value="G7">G7 (по баллистическому коэф.)</option>
+        <option value="CD">Постоянный Cd (мячи, стрелы, ядра)</option>
+      </select></div>
+    <div class="span2 only-bc"><label>Баллистический коэф. (BC, фунт/дюйм²)</label><input id="bc" type="number" inputmode="decimal" step="0.001" value="0.462"></div>
+    <div class="only-cd"><label>Коэф. сопротивления Cd</label><input id="cd" type="number" inputmode="decimal" step="0.01" value="0.47"></div>
+    <div class="only-cd"><label>Диаметр (миделя), мм</label><input id="dia" type="number" inputmode="decimal" value="74"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Вылет</h2>
+  <div class="grid">
+    <div class="span2"><label>Как задаётся направление</label>
+      <select id="aim">
+        <option value="zero">Пристрелка на дистанции (прицел)</option>
+        <option value="angle">Угол вылета вручную</option>
+      </select></div>
+    <div class="only-zero"><label>Высота прицела над осью, мм</label><input id="h" type="number" inputmode="decimal" value="45"></div>
+    <div class="only-zero"><label>Дистанция пристрелки, м</label><input id="zero" type="number" inputmode="decimal" value="100"></div>
+    <div class="only-angle"><label>Угол вылета, ° (вверх +)</label><input id="angle" type="number" inputmode="decimal" step="0.1" value="30"></div>
+    <div><label>Высота точки вылета над землёй, м</label><input id="H0" type="number" inputmode="decimal" step="0.1" value="1.5"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Погода</h2>
+  <div class="grid">
+    <div><label>Температура, °C</label><input id="T" type="number" inputmode="decimal" value="15"></div>
+    <div><label>Давление, гПа</label><input id="P" type="number" inputmode="decimal" value="1013"></div>
+    <div><label>Скорость ветра, м/с</label><input id="wind" type="number" inputmode="decimal" value="0"></div>
+    <div><label>Откуда ветер, ° (0 — в лицо, 90 — справа, 180 — в спину, 270 — слева)</label>
+      <input id="wdir" type="number" inputmode="decimal" value="90"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Таблица</h2>
+  <div class="grid">
+    <div><label>Макс. дистанция, м</label><input id="maxD" type="number" inputmode="numeric" value="800"></div>
+    <div><label>Шаг, м</label><input id="step" type="number" inputmode="numeric" value="50"></div>
+    <div class="span2 only-zero"><label>Цена щелчка прицела</label>
+      <select id="click">
+        <option value="moa:0.25">1/4 MOA</option>
+        <option value="moa:0.5">1/2 MOA</option>
+        <option value="moa:1">1 MOA</option>
+        <option value="mil:0.1" selected>0,1 MIL</option>
+        <option value="mil:0.05">0,05 MIL</option>
+      </select></div>
+  </div>
+</div>
+
+<div class="btnrow">
+  <button id="go">Рассчитать</button>
+  <button id="viz-open" class="sec">▶ Визуализация</button>
+</div>
+<div id="err" class="err"></div>
+
+<div class="card" id="outcard" style="margin-top:12px; display:none">
+  <h2 id="outh">Поправки</h2>
+  <div class="wrap"><table id="out"></table></div>
+  <div class="note" id="outnote"></div>
+</div>
+
+<div class="note">
+  Модель: материальная точка в трёх измерениях с сопротивлением воздуха (стандартные кривые G1/G7 либо постоянный Cd),
+  плотность воздуха по температуре и давлению (без учёта влажности), ветер учитывается как движение воздуха.
+  Не учитываются вращение и сила Магнуса (подъёмная сила мячей), деривация, эффект Кориолиса и разброс.
+  Для реальной стрельбы обязательно сверяйте расчёт с пристрелкой.
+</div>
+
+<!-- ===== ВИЗУАЛИЗАЦИЯ ===== -->
+<div id="viz" hidden>
+  <div class="vbar"><b id="vtitle">Визуализация полёта</b><button id="vclose">✕ Закрыть</button></div>
+  <canvas id="cv"></canvas>
+  <div class="ctl">
+    <button id="vplay">⏸</button>
+    <button id="vrestart">⟲</button>
+    <select id="vspeed">
+      <option value="auto">Авто (≈8 с)</option>
+      <option value="1">1× (реальное)</option>
+      <option value="0.5">0,5×</option>
+      <option value="0.1">0,1×</option>
+      <option value="0.01">0,01×</option>
+    </select>
+    <select id="vview">
+      <option value="side">Вид сбоку (x–y)</option>
+      <option value="top">Вид сверху (x–z)</option>
+    </select>
+    <label><input type="checkbox" id="veq"> равный масштаб</label>
+  </div>
+  <input type="range" id="vscrub" min="0" max="1000" value="0">
+  <div class="note">Коснитесь графика, чтобы перейти к точке траектории.</div>
+  <div class="reads" id="vreads"></div>
+  <div class="ctl"><select id="vser">
+    <option value="v">График: скорость V</option>
+    <option value="n">График: перегрузка n</option>
+    <option value="ad">График: торможение (сопротивл.)</option>
+    <option value="a">График: полное ускорение</option>
+    <option value="y">График: высота y</option>
+    <option value="mach">График: число Маха</option>
+  </select></div>
+  <canvas id="cg"></canvas>
+  <div class="note" id="vsum"></div>
+  <div class="note">
+    Перегрузка n — это торможение от сопротивления воздуха в единицах g (то, что «чувствует» тело в полёте).
+    Полное ускорение включает ещё и силу тяжести. Разгон в стволе и удар о цель не моделируются.
+    Красная стрелка — направление торможения, зелёная — скорости.
+  </div>
+</div>
+
+<script>
+// ===== ЯДРО РАСЧЁТА =====
+const G1 = [[0,.2629],[.05,.2558],[.10,.2487],[.15,.2413],[.20,.2344],[.25,.2278],[.30,.2214],[.35,.2155],[.40,.2104],[.45,.2061],[.50,.2032],[.55,.2020],[.60,.2034],[.70,.2165],[.725,.2230],[.75,.2313],[.775,.2417],[.80,.2546],[.825,.2706],[.85,.2901],[.875,.3136],[.90,.3415],[.925,.3734],[.95,.4084],[.975,.4448],[1.0,.4805],[1.025,.5136],[1.05,.5427],[1.075,.5677],[1.10,.5883],[1.125,.6053],[1.15,.6191],[1.20,.6393],[1.25,.6518],[1.30,.6589],[1.35,.6621],[1.40,.6625],[1.45,.6607],[1.50,.6573],[1.55,.6528],[1.60,.6474],[1.65,.6413],[1.70,.6347],[1.75,.6280],[1.80,.6210],[1.85,.6141],[1.90,.6072],[1.95,.6003],[2.00,.5934],[2.05,.5867],[2.10,.5804],[2.15,.5743],[2.20,.5685],[2.25,.5630],[2.30,.5577],[2.35,.5527],[2.40,.5481],[2.45,.5438],[2.50,.5397],[2.60,.5325],[2.70,.5264],[2.80,.5211],[2.90,.5168],[3.00,.5133],[3.10,.5105],[3.20,.5084],[3.30,.5067],[3.40,.5054],[3.50,.5040],[3.60,.5030],[3.70,.5022],[3.80,.5016],[3.90,.5010],[4.00,.5006],[4.20,.4998],[4.40,.4995],[4.60,.4992],[4.80,.4990],[5.00,.4988]];
+const G7 = [[0,.1198],[.05,.1197],[.10,.1196],[.15,.1194],[.20,.1193],[.25,.1194],[.30,.1194],[.35,.1194],[.40,.1193],[.45,.1193],[.50,.1194],[.55,.1193],[.60,.1194],[.65,.1197],[.70,.1202],[.725,.1207],[.75,.1215],[.775,.1226],[.80,.1242],[.825,.1266],[.85,.1306],[.875,.1368],[.90,.1464],[.925,.1660],[.95,.2054],[.975,.2993],[1.0,.3803],[1.025,.4015],[1.05,.4043],[1.075,.4034],[1.10,.4014],[1.125,.3987],[1.15,.3955],[1.20,.3884],[1.25,.3810],[1.30,.3732],[1.35,.3657],[1.40,.3580],[1.45,.3510],[1.50,.3440],[1.55,.3376],[1.60,.3315],[1.65,.3260],[1.70,.3209],[1.75,.3160],[1.80,.3117],[1.85,.3078],[1.90,.3042],[1.95,.3010],[2.00,.2980],[2.05,.2951],[2.10,.2922],[2.15,.2892],[2.20,.2864],[2.25,.2835],[2.30,.2807],[2.35,.2779],[2.40,.2752],[2.45,.2725],[2.50,.2697],[2.55,.2670],[2.60,.2643],[2.65,.2615],[2.70,.2588],[2.75,.2561],[2.80,.2533],[2.85,.2506],[2.90,.2479],[2.95,.2451],[3.00,.2424],[3.10,.2368],[3.20,.2313],[3.30,.2258],[3.40,.2205],[3.50,.2154],[3.60,.2106],[3.70,.2060],[3.80,.2017],[3.90,.1975],[4.00,.1935],[4.20,.1861],[4.40,.1793],[4.60,.1730],[4.80,.1672],[5.00,.1618]];
+
+const GRAV = 9.80665;
+const SAMPLE_KEYS = ['x','y','z','v','vx','vy','vz','ad','a','n','mach'];
+
+function cdAt(tab, m) {
+  if (m <= tab[0][0]) return tab[0][1];
+  const n = tab.length;
+  if (m >= tab[n-1][0]) return tab[n-1][1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (tab[mid][0] <= m) lo = mid; else hi = mid; }
+  const f = (m - tab[lo][0]) / (tab[hi][0] - tab[lo][0]);
+  return tab[lo][1] + f * (tab[hi][1] - tab[lo][1]);
+}
+
+// Окружающая среда и закон сопротивления: drag(sp) -> kd, замедление = kd * (скорость относительно воздуха)
+function makeEnv(p) {
+  const Tk = p.T + 273.15;
+  const rho = p.P * 100 / (287.05 * Tk);
+  const c = Math.sqrt(1.4 * 287.05 * Tk);
+  const phi = p.wdir * Math.PI / 180;
+  const head = p.wind * Math.cos(phi);   // встречная составляющая (в лицо)
+  const cross = p.wind * Math.sin(phi);  // >0: ветер справа
+  let drag;
+  if (p.model === 'CD') {
+    const A = Math.PI / 4 * Math.pow(p.dia / 1000, 2);
+    const k = 0.5 * rho * A * p.cd / (p.mass / 1000);
+    drag = sp => k * sp;
+  } else {
+    const tab = p.model === 'G7' ? G7 : G1;
+    const K = Math.PI / 8 * rho / (p.bc * 703.0696);
+    drag = sp => K * cdAt(tab, sp / c) * sp;
+  }
+  return { rho, c, head, cross, drag };
+}
+
+function dtFor(p) { return p.v0 > 300 ? 0.0005 : (p.v0 > 100 ? 0.001 : 0.002); }
+
+// Интегрирование полёта в 3D. x — вперёд, y — вверх, z — вправо.
+// o: { dt, targets, ground, store, every, tmax }
+function run(p, theta, y0, o) {
+  const e = makeEnv(p), dt = o.dt, T = o.targets || [], every = o.every || 1, tmax = o.tmax || 120;
+  let x = 0, y = y0, z = 0, vx = p.v0 * Math.cos(theta), vy = p.v0 * Math.sin(theta), vz = 0, t = 0, step = 0, k = 0;
+  const rec = [];
+  const S = o.store ? { t: [] } : null;
+  if (S) SAMPLE_KEYS.forEach(key => S[key] = []);
+  let end = null;
+
+  function push(tt, xx, yy, zz, vxx, vyy, vzz, ad, a, mach) {
+    S.t.push(tt); S.x.push(xx); S.y.push(yy); S.z.push(zz);
+    S.v.push(Math.sqrt(vxx*vxx + vyy*vyy + vzz*vzz)); S.vx.push(vxx); S.vy.push(vyy); S.vz.push(vzz);
+    S.ad.push(ad); S.a.push(a); S.n.push(ad / GRAV); S.mach.push(mach);
+  }
+
+  while (true) {
+    const rx = vx + e.head, rz = vz + e.cross;
+    const sp = Math.sqrt(rx*rx + vy*vy + rz*rz);
+    const kd = e.drag(sp);
+    const ax = -kd * rx, ay = -GRAV - kd * vy, az = -kd * rz;
+    const adr = kd * sp, atot = Math.sqrt(ax*ax + ay*ay + az*az), mach = sp / e.c;
+    if (S && step % every === 0) push(t, x, y, z, vx, vy, vz, adr, atot, mach);
+
+    vx += ax * dt; vy += ay * dt; vz += az * dt;
+    const px = x, py = y, pz = z, pt = t;
+    x += vx * dt; y += vy * dt; z += vz * dt; t += dt; step++;
+
+    while (k < T.length && x >= T[k]) {
+      const f = (T[k] - px) / (x - px);
+      rec.push({ d: T[k], y: py + f * (y - py), z: pz + f * (z - pz), t: pt + f * dt, v: Math.sqrt(vx*vx + vy*vy + vz*vz) });
+      k++;
+    }
+    if (o.ground && y < 0 && py >= 0) {
+      const f = py / (py - y);
+      end = { landed: true, x: px + f * (x - px), y: 0, z: pz + f * (z - pz), t: pt + f * dt, v: Math.sqrt(vx*vx + vy*vy + vz*vz) };
+      if (S) push(end.t, end.x, 0, end.z, vx, vy, vz, adr, atot, mach);
+      break;
+    }
+    if (T.length && k >= T.length) break;
+    if (!o.ground && vx <= 0) break;
+    if (t >= tmax) break;
+  }
+  if (!end) end = { landed: false, x, y, z, t, v: Math.sqrt(vx*vx + vy*vy + vz*vz) };
+  return { rec, S, end };
+}
+
+// Угол вылета из условия «пуля пересекает линию прицеливания на дистанции пристрелки»
+function solveTheta(p) {
+  const dt = dtFor(p), h = p.h / 1000;
+  let a = -0.05, b = 0.6;
+  for (let i = 0; i < 50; i++) {
+    const m = (a + b) / 2;
+    const r = run(p, m, -h, { dt, targets: [p.zero], tmax: 60 }).rec;
+    if (!r.length || r[0].y < 0) a = m; else b = m;
+  }
+  return (a + b) / 2;
+}
+
+// Таблица поправок / траектории
+function solve(p) {
+  const dt = dtFor(p), zeroMode = p.aim === 'zero';
+  const theta = zeroMode ? solveTheta(p) : p.angle * Math.PI / 180;
+  const y0 = zeroMode ? -p.h / 1000 : p.H0;
+  const dists = [];
+  for (let d = p.step; d <= p.maxD + 1e-9; d += p.step) dists.push(d);
+  if (zeroMode && !dists.includes(p.zero)) { dists.push(p.zero); dists.sort((u, w) => u - w); }
+  const r = run(p, theta, y0, { dt, targets: dists, ground: !zeroMode, tmax: 300 });
+  const m = p.mass / 1000;
+  const rows = r.rec.map(q => {
+    const base = { d: q.d, v: q.v, e: 0.5 * m * q.v * q.v, t: q.t };
+    if (zeroMode) {
+      const dropM = -q.y, corrR = -q.z;   // поднять прицел на dropM, сместить вправо на corrR
+      return Object.assign(base, {
+        dropCm: dropM * 100, moa: dropM / q.d * 3437.7468, mil: dropM / q.d * 1000,
+        windCm: corrR * 100, windMoa: corrR / q.d * 3437.7468, windMil: corrR / q.d * 1000
+      });
+    }
+    return Object.assign(base, { y: q.y, z: q.z });
+  });
+  return { rows, theta, end: r.end };
+}
+
+// Полная траектория для визуализации
+function simulate(p) {
+  const dt = dtFor(p);
+  const theta = p.aim === 'zero' ? solveTheta(p) : p.angle * Math.PI / 180;
+  const every = Math.max(1, Math.round(0.002 / dt));
+  const r = run(p, theta, p.H0, { dt, ground: true, store: true, every, tmax: 120 });
+  return { theta, S: r.S, end: r.end };
+}
+// ===== КОНЕЦ ЯДРА =====
+
+const $ = id => document.getElementById(id);
+const FIELDS = ['v0','mass','bc','model','cd','dia','aim','angle','H0','h','zero','T','P','wind','wdir','maxD','step','click'];
+
+const PRESETS = {
+  '308':  { model:'G1', v0:800, mass:10.9, bc:0.462, aim:'zero', h:45, zero:100, H0:1.5, maxD:800, step:50 },
+  '223':  { model:'G1', v0:990, mass:3.56, bc:0.243, aim:'zero', h:45, zero:100, H0:1.5, maxD:600, step:50 },
+  '54r':  { model:'G1', v0:820, mass:9.6,  bc:0.400, aim:'zero', h:45, zero:100, H0:1.5, maxD:600, step:50 },
+  '9mm':  { model:'G1', v0:350, mass:8.0,  bc:0.150, aim:'zero', h:35, zero:25,  H0:1.5, maxD:200, step:25 },
+  '22lr': { model:'G1', v0:330, mass:2.6,  bc:0.140, aim:'zero', h:40, zero:50,  H0:1.5, maxD:200, step:25 },
+  'pellet':{model:'G1', v0:250, mass:0.54, bc:0.030, aim:'zero', h:40, zero:30,  H0:1.5, maxD:80,  step:10 },
+  'arrow':    { model:'CD', v0:85, mass:28,   cd:2.0,  dia:8,    aim:'angle', angle:3,  H0:1.5, maxD:100, step:10 },
+  'baseball': { model:'CD', v0:40, mass:145,  cd:0.35, dia:74,   aim:'angle', angle:35, H0:1.5, maxD:150, step:10 },
+  'golf':     { model:'CD', v0:70, mass:45.9, cd:0.25, dia:42.7, aim:'angle', angle:12, H0:0,   maxD:300, step:25 },
+  'soccer':   { model:'CD', v0:28, mass:430,  cd:0.25, dia:220,  aim:'angle', angle:30, H0:0,   maxD:100, step:10 },
+  'shot':     { model:'CD', v0:14, mass:7260, cd:0.47, dia:120,  aim:'angle', angle:37, H0:2,   maxD:30,  step:2 },
+  'stone':    { model:'CD', v0:25, mass:100,  cd:0.47, dia:42,   aim:'angle', angle:45, H0:1.8, maxD:100, step:10 },
+  'cannonball':{model:'CD', v0:400, mass:2700, cd:0.6, dia:94,   aim:'angle', angle:8,  H0:1.5, maxD:1500, step:100 }
+};
+
+function syncUI() {
+  const cdMode = $('model').value === 'CD', zero = $('aim').value === 'zero';
+  document.querySelectorAll('.only-bc').forEach(el => el.hidden = cdMode);
+  document.querySelectorAll('.only-cd').forEach(el => el.hidden = !cdMode);
+  document.querySelectorAll('.only-zero').forEach(el => el.hidden = !zero);
+  document.querySelectorAll('.only-angle').forEach(el => el.hidden = zero);
+}
+function save() {
+  try { const o = {}; FIELDS.forEach(f => o[f] = $(f).value); localStorage.setItem('ballistic2', JSON.stringify(o)); } catch (e) {}
+}
+function load() {
+  try { const o = JSON.parse(localStorage.getItem('ballistic2') || 'null'); if (o) FIELDS.forEach(f => { if (o[f] != null) $(f).value = o[f]; }); } catch (e) {}
+}
+
+function fmt(x, n) { return (Math.abs(x) < Math.pow(10, -n) / 2 ? 0 : x).toFixed(n); }
+function sgn(x, n) { const s = fmt(x, n); return (x > 0 && +s !== 0 ? '+' : '') + s; }
+
+function readParams() {
+  const err = $('err'); err.textContent = '';
+  const p = {
+    v0: +$('v0').value, mass: +$('mass').value, bc: +$('bc').value, model: $('model').value,
+    cd: +$('cd').value, dia: +$('dia').value, aim: $('aim').value, angle: +$('angle').value,
+    H0: +$('H0').value, h: +$('h').value, zero: +$('zero').value,
+    T: +$('T').value, P: +$('P').value, wind: +$('wind').value, wdir: +$('wdir').value,
+    maxD: +$('maxD').value, step: +$('step').value
+  };
+  const bad = m => { err.textContent = m; return null; };
+  if (!(p.v0 > 1 && p.mass > 0)) return bad('Скорость и масса должны быть положительными.');
+  if (p.model === 'CD') { if (!(p.cd > 0 && p.dia > 0)) return bad('Укажите Cd и диаметр больше нуля.'); }
+  else if (!(p.bc > 0)) return bad('Баллистический коэффициент должен быть больше нуля.');
+  if (!(p.P > 300) || !(p.T > -80 && p.T < 70)) return bad('Проверьте температуру и давление.');
+  if (p.aim === 'zero') { if (!(p.zero > 0) || !(p.h >= 0)) return bad('Проверьте дистанцию пристрелки и высоту прицела.'); }
+  else if (!(p.angle > -89 && p.angle < 89)) return bad('Угол вылета должен быть от −89° до 89°.');
+  if (!(p.H0 >= 0)) return bad('Высота точки вылета не может быть отрицательной.');
+  if (!(p.step > 0 && p.maxD >= p.step)) return bad('Проверьте шаг и максимальную дистанцию.');
+  if (p.maxD / p.step > 400) return bad('Слишком много строк: увеличьте шаг.');
+  return p;
+}
+
+function calc() {
+  const p = readParams(); if (!p) return;
+  const r = solve(p), t = $('out'), zeroMode = p.aim === 'zero';
+  let html = '';
+  if (zeroMode) {
+    const [unit, val] = $('click').value.split(':'), cv = +val, U = unit === 'moa' ? 'MOA' : 'MIL';
+    html = '<tr><th>Дист., м</th><th>V, м/с</th><th>E, Дж</th><th>t, с</th><th>Верт., см</th><th>Верт., ' + U + '</th><th>Щелч. ↑</th><th>Ветер, см</th><th>Ветер, ' + U + '</th><th>Щелч. ↔</th></tr>';
+    r.rows.forEach(q => {
+      const vert = unit === 'moa' ? q.moa : q.mil, wnd = unit === 'moa' ? q.windMoa : q.windMil;
+      html += '<tr' + (q.d === p.zero ? ' class="zero"' : '') + '><td>' + q.d + '</td><td>' + fmt(q.v, 0) + '</td><td>' + fmt(q.e, 0) + '</td><td>' + fmt(q.t, 2) +
+        '</td><td>' + sgn(q.dropCm, 1) + '</td><td>' + sgn(vert, 2) + '</td><td>' + sgn(vert / cv, 0) +
+        '</td><td>' + sgn(q.windCm, 1) + '</td><td>' + sgn(wnd, 2) + '</td><td>' + sgn(wnd / cv, 0) + '</td></tr>';
+    });
+    $('outh').textContent = 'Поправки';
+    $('outnote').textContent = '«Верт.» — на сколько поднять точку прицеливания (↑), «Ветер» — на сколько сместить её в сторону, откуда дует ветер (→ вправо, ← влево). Расчёт для цели на уровне прицела; угол вылета из пристрелки: ' + fmt(r.theta * 180 / Math.PI, 3) + '°.';
+  } else {
+    html = '<tr><th>Дист., м</th><th>V, м/с</th><th>E, Дж</th><th>t, с</th><th>Высота, м</th><th>Боковое z, м</th></tr>';
+    r.rows.forEach(q => {
+      html += '<tr><td>' + q.d + '</td><td>' + fmt(q.v, 1) + '</td><td>' + fmt(q.e, 0) + '</td><td>' + fmt(q.t, 2) + '</td><td>' + fmt(q.y, 2) + '</td><td>' + sgn(q.z, 2) + '</td></tr>';
+    });
+    if (r.end.landed) {
+      html += '<tr class="land"><td>падение ' + fmt(r.end.x, 1) + '</td><td>' + fmt(r.end.v, 1) + '</td><td>' + fmt(0.5 * p.mass / 1000 * r.end.v * r.end.v, 0) + '</td><td>' + fmt(r.end.t, 2) + '</td><td>0.00</td><td>' + sgn(r.end.z, 2) + '</td></tr>';
+    }
+    $('outh').textContent = 'Траектория';
+    $('outnote').textContent = 'Высота — над землёй; боковое смещение z: + вправо, − влево. Строки заканчиваются в точке падения.';
+  }
+  t.innerHTML = html;
+  $('outcard').style.display = 'block';
+  save();
+}
+
+// ===== ВИЗУАЛИЗАЦИЯ =====
+let V = null;                         // данные текущей визуализации
+const anim = { t: 0, playing: true, last: 0, scale: 1 };
+const COL = { acc: '#e0a526', blue: '#4da3ff', red: '#ff6b6b', grn: '#5fd38d', grid: '#222a35', txt: '#8b97a8', gnd: '#1d2530' };
+
+const READS = [
+  ['t','Время t, с',3], ['x','Дистанция x, м',1], ['y','Высота y, м',2],
+  ['z','Боковое z, м (+ вправо)',2], ['v','Скорость V, м/с',1], ['kmh','V, км/ч',0],
+  ['vx','Vx, м/с',1], ['vy','Vy, м/с',1], ['mach','Число Маха',2],
+  ['ang','Угол траектории, °',2], ['a','Ускорение полное, м/с²',2], ['ad','Торможение (сопротивл.), м/с²',2],
+  ['n','Перегрузка n, g',3], ['F','Сила сопротивления, Н',2], ['E','Кин. энергия, Дж',1]
+];
+const SERIES = {
+  v: ['Скорость V, м/с'], n: ['Перегрузка n, g'], ad: ['Торможение от сопротивления, м/с²'],
+  a: ['Полное ускорение, м/с²'], y: ['Высота y, м'], mach: ['Число Маха']
+};
+
+function buildReads() {
+  $('vreads').innerHTML = READS.map(r => '<div class="rd"><span class="l">' + r[1] + '</span><b id="r_' + r[0] + '">—</b></div>').join('');
+}
+
+function niceStep(range, n) {
+  const raw = range / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), r = raw / mag;
+  return (r < 1.5 ? 1 : r < 3 ? 2 : r < 7 ? 5 : 10) * mag;
+}
+function tickLabel(v, step) {
+  const d = step >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(step)));
+  return (+v.toFixed(d)).toString();
+}
+
+function locate(t) {
+  const T = V.S.t, last = T.length - 1;
+  if (last < 1 || t <= T[0]) return { i: 0, f: 0 };
+  if (t >= T[last]) return { i: last - 1, f: 1 };
+  let lo = 0, hi = last;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= t) lo = m; else hi = m; }
+  const d = T[hi] - T[lo];
+  return { i: lo, f: d > 0 ? (t - T[lo]) / d : 0 };
+}
+function interp(t) {
+  const S = V.S, loc = locate(t), i = loc.i, j = Math.min(i + 1, S.t.length - 1), o = { t, i };
+  SAMPLE_KEYS.forEach(k => { o[k] = S[k][i] + loc.f * (S[k][j] - S[k][i]); });
+  return o;
+}
+
+function setupCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  return { c, W, H };
+}
+
+function drawMain(cur) {
+  const { c, W, H } = setupCanvas($('cv'));
+  const S = V.S, top = $('vview').value === 'top', eq = $('veq').checked;
+  const hv = top ? S.z : S.y;
+  V.hv = hv;
+  const L = 46, R = 12, Tp = 12, B = 26, pw = W - L - R, ph = H - Tp - B;
+
+  // границы
+  let x0 = Math.min(0, V.xmin), x1 = Math.max(V.xmax, 1) * 1.04;
+  let v0, v1;
+  if (top) {
+    const lo = Math.min(0, V.zmin), hi = Math.max(0, V.zmax), span = Math.max(hi - lo, 2);
+    v0 = lo - span * 0.1; v1 = hi + span * 0.1;
+    if (hi - lo < 2) { const mid = (hi + lo) / 2; v0 = mid - 1.1; v1 = mid + 1.1; }
+  } else {
+    const lo = Math.min(0, V.ymin), hi = V.ymax, span = Math.max(hi - lo, 1);
+    v0 = lo - span * 0.04; v1 = hi + span * 0.14;
+  }
+  let sx = pw / (x1 - x0), sy = ph / (v1 - v0), offY = 0;
+  if (eq) { const s = Math.min(sx, sy); sx = sy = s; if (top) offY = (ph - (v1 - v0) * sy) / 2; }
+  const X = x => L + (x - x0) * sx;
+  const Y = v => Tp + ph - offY - (v - v0) * sy;
+  V.X = X; V.Y = Y;
+
+  c.font = '11px system-ui,sans-serif'; c.lineWidth = 1;
+  // земля
+  if (!top) {
+    c.fillStyle = COL.gnd; c.fillRect(L, Y(0), pw, Tp + ph - Y(0) + 0.5);
+  }
+  // сетка и подписи
+  const xs = niceStep(pw / sx, Math.max(3, Math.floor(pw / 80)));
+  const vs = niceStep(ph / sy, Math.max(3, Math.floor(ph / 45)));
+  c.fillStyle = COL.txt; c.strokeStyle = COL.grid;
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let gx = Math.ceil(x0 / xs) * xs; gx <= x1 + 1e-9; gx += xs) {
+    const px = X(gx); if (px < L - 1 || px > L + pw + 1) continue;
+    c.beginPath(); c.moveTo(px, Tp); c.lineTo(px, Tp + ph); c.stroke();
+    c.fillText(tickLabel(gx, xs), px, Tp + ph + 5);
+  }
+  c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (let gv = Math.ceil(v0 / vs) * vs; gv <= v1 + 1e-9; gv += vs) {
+    const py = Y(gv); if (py < Tp - 1 || py > Tp + ph + 1) continue;
+    c.beginPath(); c.moveTo(L, py); c.lineTo(L + pw, py); c.stroke();
+    c.fillText(tickLabel(gv, vs), L - 5, py);
+  }
+  c.textAlign = 'left'; c.textBaseline = 'top';
+  c.fillText(top ? 'z, м' : 'y, м', 4, 2);
+  c.textAlign = 'right'; c.fillText('x, м', W - 4, Tp + ph - 14);
+
+  // линия земли / оси прицеливания
+  c.save();
+  if (!top) { c.strokeStyle = '#6b5a3a'; c.lineWidth = 2; c.beginPath(); c.moveTo(L, Y(0)); c.lineTo(L + pw, Y(0)); c.stroke(); }
+  else { c.strokeStyle = '#3a4656'; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(L, Y(0)); c.lineTo(L + pw, Y(0)); c.stroke(); }
+  if (!top && V.p.aim === 'zero') {   // линия прицеливания
+    const ys = V.p.H0 + V.p.h / 1000;
+    c.strokeStyle = '#4a5a70'; c.setLineDash([2, 4]); c.beginPath(); c.moveTo(L, Y(ys)); c.lineTo(L + pw, Y(ys)); c.stroke();
+  }
+  c.restore();
+
+  // вся траектория (бледно)
+  const n = S.t.length, dec = Math.max(1, Math.ceil(n / 1500));
+  c.save(); c.beginPath(); c.rect(L, Tp, pw, ph); c.clip();
+  c.strokeStyle = '#3b4658'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath();
+  for (let i = 0; i < n; i += dec) { const px = X(S.x[i]), py = Y(hv[i]); if (i === 0) c.moveTo(px, py); else c.lineTo(px, py); }
+  c.lineTo(X(S.x[n - 1]), Y(hv[n - 1])); c.stroke(); c.setLineDash([]);
+
+  // пройденный участок
+  c.strokeStyle = COL.acc; c.lineWidth = 2.5; c.beginPath(); c.moveTo(X(S.x[0]), Y(hv[0]));
+  const ci = cur.i, dec2 = Math.max(1, Math.ceil(ci / 1500));
+  for (let i = dec2; i <= ci; i += dec2) c.lineTo(X(S.x[i]), Y(hv[i]));
+  const hcur = top ? cur.z : cur.y;
+  c.lineTo(X(cur.x), Y(hcur)); c.stroke();
+
+  // вершина и точка падения
+  if (!top && V.ymax > 0.05) {
+    const ax = X(V.xApex), ay = Y(V.ymax);
+    c.fillStyle = COL.blue; c.beginPath(); c.arc(ax, ay, 3.5, 0, 7); c.fill();
+    c.fillStyle = COL.blue; c.font = '11px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    c.fillText('H=' + fmt(V.ymax, V.ymax < 10 ? 2 : 1) + ' м', Math.min(Math.max(ax, L + 34), L + pw - 34), ay - 5);
+  }
+  if (V.end.landed) {
+    const lx = X(V.end.x), ly = Y(top ? V.end.z : 0);
+    c.fillStyle = COL.red; c.beginPath(); c.arc(lx, ly, 4, 0, 7); c.fill();
+    c.textAlign = 'right'; c.textBaseline = 'bottom'; c.fillStyle = COL.red;
+    c.fillText('X=' + fmt(V.end.x, V.end.x < 100 ? 1 : 0) + ' м', Math.min(lx - 6, L + pw - 4), ly - 6);
+  }
+  c.restore();
+
+  // тело и векторы (в экранных координатах, по касательной к нарисованной кривой)
+  const px = X(cur.x), py = Y(hcur);
+  const j = Math.min(cur.i + 1, n - 1), i0 = j === cur.i ? Math.max(0, cur.i - 1) : cur.i;
+  let dx = X(S.x[j]) - X(S.x[i0]), dy = Y(hv[j]) - Y(hv[i0]);
+  const dl = Math.sqrt(dx * dx + dy * dy); if (dl < 1e-9) { dx = 1; dy = 0; } else { dx /= dl; dy /= dl; }
+  const arrow = (len, col, sgnv) => {
+    const ex = px + dx * len * sgnv, ey = py + dy * len * sgnv, a = Math.atan2(dy * sgnv, dx * sgnv);
+    c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(px, py); c.lineTo(ex, ey); c.stroke();
+    c.beginPath(); c.moveTo(ex, ey); c.lineTo(ex - 7 * Math.cos(a - 0.45), ey - 7 * Math.sin(a - 0.45)); c.lineTo(ex - 7 * Math.cos(a + 0.45), ey - 7 * Math.sin(a + 0.45)); c.closePath(); c.fill();
+  };
+  arrow(34, COL.grn, 1);
+  arrow(8 + 30 * Math.min(1, cur.n / Math.max(V.nmax, 1e-9)), COL.red, -1);
+  c.fillStyle = '#fff'; c.strokeStyle = COL.acc; c.lineWidth = 2;
+  c.beginPath(); c.arc(px, py, 5, 0, 7); c.fill(); c.stroke();
+}
+
+function drawSeries(cur) {
+  const { c, W, H } = setupCanvas($('cg'));
+  const key = $('vser').value, arr = V.S[key], T = V.S.t, n = T.length;
+  if (!V.rng[key]) { let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) { if (arr[i] < lo) lo = arr[i]; if (arr[i] > hi) hi = arr[i]; } V.rng[key] = [lo, hi]; }
+  let [lo, hi] = V.rng[key];
+  if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const L = 46, R = 10, Tp = 8, B = 20, pw = W - L - R, ph = H - Tp - B, tmax = T[n - 1] || 1;
+  const X = t => L + t / tmax * pw, Y = v => Tp + ph - (v - lo) / (hi - lo) * ph;
+  c.font = '11px system-ui,sans-serif'; c.strokeStyle = COL.grid; c.fillStyle = COL.txt; c.lineWidth = 1;
+  const vs = niceStep(hi - lo, 3), ts = niceStep(tmax, Math.max(3, Math.floor(pw / 70)));
+  c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (let g = Math.ceil(lo / vs) * vs; g <= hi; g += vs) { const py = Y(g); c.beginPath(); c.moveTo(L, py); c.lineTo(L + pw, py); c.stroke(); c.fillText(tickLabel(g, vs), L - 5, py); }
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let g = 0; g <= tmax + 1e-9; g += ts) { const px = X(g); c.beginPath(); c.moveTo(px, Tp); c.lineTo(px, Tp + ph); c.stroke(); c.fillText(tickLabel(g, ts) + ' с', px, Tp + ph + 4); }
+  c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = COL.blue; c.fillText(SERIES[key][0], L + 6, Tp + 2);
+  c.strokeStyle = COL.blue; c.lineWidth = 2; c.beginPath();
+  const dec = Math.max(1, Math.ceil(n / 1200));
+  for (let i = 0; i < n; i += dec) { const px = X(T[i]), py = Y(arr[i]); if (i === 0) c.moveTo(px, py); else c.lineTo(px, py); }
+  c.lineTo(X(T[n - 1]), Y(arr[n - 1])); c.stroke();
+  const cx = X(cur.t), cy = Y(cur[key]);
+  c.strokeStyle = COL.acc; c.lineWidth = 1.5; c.beginPath(); c.moveTo(cx, Tp); c.lineTo(cx, Tp + ph); c.stroke();
+  c.fillStyle = COL.acc; c.beginPath(); c.arc(cx, cy, 4, 0, 7); c.fill();
+}
+
+function updateReads(cur) {
+  const m = V.p.mass / 1000;
+  const val = {
+    t: cur.t, x: cur.x, y: cur.y, z: cur.z, v: cur.v, kmh: cur.v * 3.6, vx: cur.vx, vy: cur.vy, mach: cur.mach,
+    ang: Math.atan2(cur.vy, cur.vx) * 180 / Math.PI, a: cur.a, ad: cur.ad, n: cur.n,
+    F: m * cur.ad, E: 0.5 * m * cur.v * cur.v
+  };
+  READS.forEach(r => { $('r_' + r[0]).textContent = (r[0] === 'z' || r[0] === 'ang' || r[0] === 'vx' || r[0] === 'vy' ? sgn(val[r[0]], r[2]) : fmt(val[r[0]], r[2])); });
+}
+
+function render() {
+  if (!V) return;
+  const cur = interp(anim.t);
+  drawMain(cur); drawSeries(cur); updateReads(cur);
+  $('vscrub').value = Math.round(anim.t / V.Tend * 1000);
+}
+
+function currentScale() {
+  const s = $('vspeed').value;
+  return s === 'auto' ? Math.max(V.Tend, 1e-6) / 8 : +s;
+}
+function setPlaying(on) { anim.playing = on; anim.last = performance.now(); $('vplay').textContent = on ? '⏸' : '▶'; }
+
+function tick(ts) {
+  if (!V || !V.open) return;
+  if (anim.playing) {
+    const dtr = Math.min(0.1, Math.max(0, (ts - anim.last) / 1000));
+    anim.t += dtr * anim.scale;
+    if (anim.t >= V.Tend) { anim.t = V.Tend; setPlaying(false); }
+  }
+  anim.last = ts;
+  render();
+  requestAnimationFrame(tick);
+}
+
+function openViz() {
+  const p = readParams(); if (!p) return;
+  save();
+  const sim = simulate(p), S = sim.S, n = S.t.length;
+  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity, zmin = Infinity, zmax = -Infinity, nmax = 0, apex = 0;
+  for (let i = 0; i < n; i++) {
+    if (S.x[i] < xmin) xmin = S.x[i]; if (S.x[i] > xmax) xmax = S.x[i];
+    if (S.y[i] < ymin) ymin = S.y[i]; if (S.y[i] > ymax) { ymax = S.y[i]; apex = i; }
+    if (S.z[i] < zmin) zmin = S.z[i]; if (S.z[i] > zmax) zmax = S.z[i];
+    if (S.n[i] > nmax) nmax = S.n[i];
+  }
+  V = { p, S, end: sim.end, theta: sim.theta, Tend: S.t[n - 1] || 0.001, xmin, xmax, ymin, ymax, zmin, zmax, nmax, xApex: S.x[apex], rng: {}, open: true };
+  $('vtitle').textContent = 'Полёт: ' + (p.model === 'CD' ? 'Cd=' + p.cd : p.model + ' BC=' + p.bc) + ', V₀=' + p.v0 + ' м/с, ' + fmt(sim.theta * 180 / Math.PI, 2) + '°';
+  let sum = 'Дальность ' + fmt(sim.end.x, 1) + ' м · время полёта ' + fmt(sim.end.t, 2) + ' с · макс. высота ' + fmt(ymax, 2) + ' м · скорость в конце ' + fmt(sim.end.v, 1) + ' м/с · боковое смещение ' + sgn(sim.end.z, 2) + ' м';
+  if (!sim.end.landed) sum += ' (расчёт остановлен по времени, падения нет)';
+  if (p.aim === 'zero') sum += '. Угол вылета из пристрелки ' + fmt(sim.theta * 180 / Math.PI, 3) + '°; пунктир — линия прицеливания, цель на её уровне.';
+  $('vsum').textContent = sum;
+  $('viz').hidden = false;
+  document.body.style.overflow = 'hidden';
+  anim.t = 0; anim.scale = currentScale(); setPlaying(true);
+  requestAnimationFrame(tick);
+}
+function closeViz() {
+  if (V) V.open = false;
+  $('viz').hidden = true;
+  document.body.style.overflow = '';
+}
+
+let dragging = false;
+function pick(ev) {
+  if (!V) return;
+  const r = $('cv').getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+  const S = V.S, n = S.t.length, step = Math.max(1, Math.floor(n / 3000));
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < n; i += step) { const dx = V.X(S.x[i]) - px, dy = V.Y(V.hv[i]) - py, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+  anim.t = S.t[best]; setPlaying(false); render();
+}
+
+$('cv').addEventListener('pointerdown', e => { dragging = true; pick(e); });
+$('cv').addEventListener('pointermove', e => { if (dragging) pick(e); });
+window.addEventListener('pointerup', () => { dragging = false; });
+$('vplay').addEventListener('click', () => { if (!anim.playing && anim.t >= V.Tend) anim.t = 0; setPlaying(!anim.playing); });
+$('vrestart').addEventListener('click', () => { anim.t = 0; setPlaying(true); });
+$('vspeed').addEventListener('change', () => { if (V) anim.scale = currentScale(); });
+['vview', 'veq', 'vser'].forEach(id => $(id).addEventListener('change', () => render()));
+$('vscrub').addEventListener('input', e => { if (!V) return; anim.t = (+e.target.value) / 1000 * V.Tend; setPlaying(false); render(); });
+$('vclose').addEventListener('click', closeViz);
+window.addEventListener('resize', () => { if (V && V.open) render(); });
+$('viz-open').addEventListener('click', openViz);
+
+// ===== ИНТЕРФЕЙС =====
+$('preset').addEventListener('change', e => {
+  const pr = PRESETS[e.target.value]; if (!pr) return;
+  Object.keys(pr).forEach(k => { if ($(k)) $(k).value = pr[k]; });
+  syncUI(); calc();
+});
+$('model').addEventListener('change', syncUI);
+$('aim').addEventListener('change', syncUI);
+$('go').addEventListener('click', calc);
+buildReads();
+load();
+syncUI();
+calc();
+</script>
+</body>
+</html>
